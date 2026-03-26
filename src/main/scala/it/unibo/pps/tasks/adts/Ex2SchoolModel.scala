@@ -1,6 +1,9 @@
 package it.unibo.pps.tasks.adts
 
-import it.unibo.pps.u03.extensionmethods.Sequences.Sequence, Sequence.*
+import it.unibo.pps.u03.extensionmethods.Sequences.Sequence
+import Sequence.*
+
+import scala.annotation.tailrec
 
 /*  Exercise 2: 
  *  Implement the below trait, and write a meaningful test.
@@ -90,7 +93,7 @@ object SchoolModel:
        *   .coursesOfATeacher(teacher("John")) // => Cons("Math", Cons("Italian", Nil()))
        * @return the list of courses assigned to a teacher
        */
-      def coursesOfATeacher(teacher: Teacher): Sequence[Course]
+      //def coursesOfATeacher(teacher: Teacher): Sequence[Course]
       /**
        * This method should return true if the teacher is present in the school
        * e.g.,
@@ -112,21 +115,40 @@ object SchoolModel:
        */
       def hasCourse(name: String): Boolean
   object BasicSchoolModule extends SchoolModule:
-    override type School = Nothing
-    override type Teacher = Nothing
-    override type Course = Nothing
+    opaque override type School = Sequence[(Teacher, Course)]
+    opaque override type Teacher = String
+    opaque override type Course = String
 
-    def teacher(name: String): Teacher = ???
-    def course(name: String): Course = ???
-    def emptySchool: School = ???
+    def teacher(name: String): Teacher = name
+    def course(name: String): Course = name
+    def emptySchool: School = Nil()
 
     extension (school: School)
-      def courses: Sequence[String] = ???
-      def teachers: Sequence[String] = ???
-      def setTeacherToCourse(teacher: Teacher, course: Course): School = ???
-      def coursesOfATeacher(teacher: Teacher): Sequence[Course] = ???
-      def hasTeacher(name: String): Boolean = ???
-      def hasCourse(name: String): Boolean = ???
+
+      private def distinct[A](s: Sequence[A]) : Sequence[A] = s match {
+        case Cons(h,t) => Cons(h, distinct(s.filter(x => x != h)))
+        case _ => Nil()
+      }
+
+      @tailrec
+      private def checker(s : Sequence[String])(name: String) : Boolean = s match {
+        case Cons(h,_) if h == name => true
+        case Cons(h,t) => checker(t)(name)
+        case _ => false
+      }
+
+      private def helperCoursesOfATeacher(s: Sequence[(Teacher, Course)])(teacher: Teacher) : Sequence[Course] = s match {
+        case Cons((teacherSCH, courseSCH), t) if teacherSCH == teacher => Cons(courseSCH, helperCoursesOfATeacher(t)(teacher))
+        case Cons(h, t) => helperCoursesOfATeacher(t)(teacher)
+        case _ => Nil()
+      }
+
+      def courses: Sequence[String] = distinct(school.map((teacher, course) => course))
+      def teachers: Sequence[String] = distinct(school.map((teacher, course) => teacher))
+      def setTeacherToCourse(teacher: Teacher, course: Course): School = Cons((teacher, course), school)
+      def coursesOfATeacher(teacher: Teacher): Sequence[Course] = helperCoursesOfATeacher(school)(teacher)
+      def hasTeacher(name: String): Boolean = checker(school.teachers)(name)
+      def hasCourse(name: String): Boolean = checker(school.courses)(name)
 @main def examples(): Unit =
   import SchoolModel.BasicSchoolModule.*
   val school = emptySchool
